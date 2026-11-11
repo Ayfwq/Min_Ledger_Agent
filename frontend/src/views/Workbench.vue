@@ -349,9 +349,10 @@ onBeforeUnmount(() => {
 
 .preview img {
   display: block;
-  width: 100%;
-  max-height: 320px;
-  object-fit: contain;
+  margin: 0 auto;
+  max-width: 100%;
+  max-height: 340px;
+  height: auto;
   background: #f8fafc;
 }
 
