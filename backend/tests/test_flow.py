@@ -27,7 +27,9 @@ async def _detail(client, input_id: str) -> dict:
 async def test_health(client):
     resp = await client.get("/api/v1/health")
     assert resp.status_code == 200
-    assert resp.json()["database"] == "ok"
+    body = resp.json()
+    assert body["database"] == "ok"
+    assert body["version"]
 
 
 @pytest.mark.asyncio

@@ -78,6 +78,7 @@ echo "==> waiting for health check"
 if wait_health; then
   echo "$TAG" > .last_good_tag
   docker image prune -f >/dev/null 2>&1 || true
+  echo "==> health: $(curl -fsS "http://127.0.0.1:${HTTP_PORT}/api/v1/health" || true)"
   echo "==> deploy succeeded (${TAG})"
   exit 0
 fi

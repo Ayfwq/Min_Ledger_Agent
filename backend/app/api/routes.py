@@ -488,6 +488,7 @@ async def health(session: AsyncSession = Depends(get_session)) -> HealthOut:
     running = await session.scalar(select(func.count()).select_from(Job).where(Job.status == "running"))
     return HealthOut(
         status="ok" if database == "ok" else "degraded",
+        version=settings.app_version,
         database=database,
         llm_configured=bool(settings.siliconflow_api_key),
         queue={"queued": queued or 0, "running": running or 0},

@@ -109,7 +109,7 @@ Actions 会：
 
 ```bash
 curl -s http://<server>/api/v1/health
-# {"status":"ok","database":"ok","llm_configured":true,"queue":{"queued":0,"running":0}}
+# {"status":"ok","version":"<commit>","database":"ok","llm_configured":true,"queue":{"queued":0,"running":0}}
 
 docker compose -f /opt/min-ledger/docker-compose.yml ps
 docker compose -f /opt/min-ledger/docker-compose.yml logs -f backend

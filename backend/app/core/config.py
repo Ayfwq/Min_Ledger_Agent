@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Mini Ledger Agent"
+    app_version: str = "dev"
     environment: str = "dev"
     debug: bool = False
     api_prefix: str = "/api/v1"

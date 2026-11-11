@@ -79,6 +79,8 @@ jobs:
           context: ./backend
           push: true
           provenance: false
+          build-args: |
+            APP_VERSION=${{ steps.vars.outputs.tag }}
           tags: |
             ${{ steps.images.outputs.backend }}:${{ steps.vars.outputs.tag }}
             ${{ steps.images.outputs.backend }}:latest

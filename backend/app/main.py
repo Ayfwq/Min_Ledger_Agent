@@ -43,7 +43,8 @@ async def lifespan(app: FastAPI):
     if settings.worker_enabled:
         worker.start()
     logger.info(
-        "app started env=%s text_model=%s vision_model=%s",
+        "app started version=%s env=%s text_model=%s vision_model=%s",
+        settings.app_version,
         settings.environment,
         settings.llm_text_model,
         settings.llm_vision_model,

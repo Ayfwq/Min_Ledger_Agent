@@ -178,6 +178,7 @@ class ConfirmResult(BaseModel):
 
 class HealthOut(BaseModel):
     status: str
+    version: str = "dev"
     database: str
     llm_configured: bool
     queue: dict[str, int] = {}

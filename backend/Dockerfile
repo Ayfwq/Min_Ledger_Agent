@@ -2,6 +2,7 @@ FROM python:3.12-slim AS builder
 
 ARG PIP_INDEX_URL=https://pypi.org/simple
 ARG UV_INDEX_URL=
+ARG APP_VERSION=dev
 
 ENV PIP_NO_CACHE_DIR=1 \
     UV_COMPILE_BYTECODE=1 \
@@ -24,9 +25,12 @@ RUN uv sync --frozen --no-dev && chmod +x docker-entrypoint.sh
 
 FROM python:3.12-slim AS runtime
 
+ARG APP_VERSION=dev
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/app/.venv/bin:$PATH"
+    PATH="/app/.venv/bin:$PATH" \
+    APP_VERSION=${APP_VERSION}
 
 WORKDIR /app
 
