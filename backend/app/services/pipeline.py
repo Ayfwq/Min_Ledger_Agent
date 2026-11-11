@@ -237,7 +237,12 @@ def compute_warnings(draft: Draft) -> list[dict]:
                 }
             )
     confidence = draft.confidence or {}
-    for field, key in (("amount", "amount"), ("txn_date", "date"), ("merchant", "merchant")):
+    for field, key in (
+        ("amount", "amount"),
+        ("txn_date", "date"),
+        ("merchant", "merchant"),
+        ("category", "category"),
+    ):
         score = confidence.get(key)
         if getattr(draft, field) is not None and isinstance(score, (int, float)) and score < LOW_CONFIDENCE:
             warnings.append(

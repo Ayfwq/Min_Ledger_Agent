@@ -32,6 +32,13 @@ const latestCalls = computed(() => {
   return map
 })
 
+const staleHours = computed(() => {
+  const open = (detail.value?.clarifications || []).filter((c) => c.status === 'open' && c.blocking)
+  if (!open.length) return 0
+  const oldest = Math.min(...open.map((c) => new Date(c.created_at).getTime()))
+  return Math.floor((Date.now() - oldest) / 3600000)
+})
+
 async function load(showLoading = false) {
   if (showLoading) loading.value = true
   try {
@@ -251,6 +258,15 @@ onBeforeUnmount(() => {
           </section>
 
           <section class="card block">
+            <el-alert
+              v-if="staleHours >= 24"
+              type="warning"
+              show-icon
+              :closable="false"
+              class="stale"
+              :title="`有澄清问题已等待 ${staleHours} 小时`"
+              description="可以继续补充、回复“暂不提供”，或取消该问题后在审核台直接编辑草稿。"
+            />
             <ClarificationPanel :clarifications="detail.clarifications" @changed="load()" />
           </section>
         </div>
@@ -478,6 +494,10 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.stale {
+  margin-bottom: 2px;
 }
 
 .block-head {
