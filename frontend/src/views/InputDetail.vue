@@ -187,7 +187,7 @@ onBeforeUnmount(() => {
       <section class="head card">
         <div class="head-main">
           <div class="head-top">
-            <span class="kind">{{ detail.kind === 'image' ? '截图输入' : '文本输入' }}</span>
+            <span class="kind">{{ detail.kind === 'mixed' ? '图文输入' : detail.kind === 'image' ? '截图输入' : '文本输入' }}</span>
             <StatusTag :status="detail.status" />
             <span class="time muted">{{ time(detail.created_at) }}</span>
           </div>

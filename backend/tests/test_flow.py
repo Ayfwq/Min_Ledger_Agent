@@ -352,3 +352,40 @@ async def test_merchant_catalog_falls_back_to_description(client, session, fake_
     suggestion = detail["drafts"][0]["suggestions"].get("merchant") or {}
     assert suggestion.get("matched") is True
     assert suggestion["merchant"]["name"] == "星巴克"
+
+@pytest.mark.asyncio
+async def test_mixed_text_and_image_input(client, session, fake_llm):
+    import io
+
+    from PIL import Image as PILImage
+
+    fake_llm["transactions"] = [
+        {"amount": 46.0, "date": "2026-11-08", "merchant": "海底捞", "category": "餐饮"}
+    ]
+    buf = io.BytesIO()
+    PILImage.new("RGB", (320, 480), "white").save(buf, format="PNG")
+    resp = await client.post(
+        "/api/v1/inputs/upload",
+        files={"file": ("meal.png", buf.getvalue(), "image/png")},
+        data={"text": "这是昨晚和同事的聚餐，AA 后我付了 46"},
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["kind"] == "mixed"
+    assert "聚餐" in (body["raw_text"] or "")
+    assert body["image"]["url"].startswith("/uploads/")
+
+    await _run(session, body["id"])
+    assert fake_llm.get("image_context") and "AA" in fake_llm["image_context"]
+    detail = await _detail(client, body["id"])
+    assert detail["drafts"][0]["field_sources"]["amount"] == "image"
+
+
+@pytest.mark.asyncio
+async def test_text_only_through_upload_endpoint(client, session, fake_llm):
+    fake_llm["transactions"] = [
+        {"amount": 9.9, "date": "2026-11-08", "merchant": "便利店", "category": "购物"}
+    ]
+    resp = await client.post("/api/v1/inputs/upload", data={"text": "便利店买水 9.9"})
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["kind"] == "text"

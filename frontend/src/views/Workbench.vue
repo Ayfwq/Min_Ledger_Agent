@@ -10,7 +10,6 @@ import { useStatsStore } from '@/stores/stats'
 const router = useRouter()
 
 const statsStore = useStatsStore()
-const tab = ref<'text' | 'image'>('text')
 const text = ref('')
 const submitting = ref(false)
 const inputs = ref<InputItem[]>([])
@@ -43,7 +42,6 @@ async function load() {
 }
 
 function pickExample(value: string) {
-  tab.value = 'text'
   text.value = value
 }
 
@@ -80,26 +78,18 @@ function clearFile() {
 
 async function submit() {
   if (submitting.value) return
-  if (tab.value === 'text' && !text.value.trim()) {
-    ElMessage.warning('请先输入消费描述')
-    return
-  }
-  if (tab.value === 'image' && !file.value) {
-    ElMessage.warning('请先选择或拖入截图')
+  if (!text.value.trim() && !file.value) {
+    ElMessage.warning('请输入文字描述，或添加一张截图（也可以两者都填）')
     return
   }
   submitting.value = true
   try {
-    let data: { id: string }
-    if (tab.value === 'text') {
-      const resp = await http.post('/inputs', { text: text.value.trim() })
-      data = resp.data
-    } else {
-      const form = new FormData()
-      form.append('file', file.value as File)
-      const resp = await http.post('/inputs/upload', form)
-      data = resp.data
-    }
+    // Unified submission: text and/or screenshot in one input.
+    const form = new FormData()
+    if (file.value) form.append('file', file.value)
+    if (text.value.trim()) form.append('text', text.value.trim())
+    const resp = await http.post('/inputs/upload', form)
+    const data = resp.data as { id: string }
     text.value = ''
     clearFile()
     ElMessage.success('已提交，正在识别…')
@@ -110,6 +100,12 @@ async function submit() {
   } finally {
     submitting.value = false
   }
+}
+
+function kindLabel(kind: string) {
+  if (kind === 'mixed') return '图文'
+  if (kind === 'image') return '截图'
+  return '文本'
 }
 
 function ago(iso: string) {
@@ -142,57 +138,58 @@ onBeforeUnmount(() => {
 <template>
   <div class="workbench">
     <div class="grid-2">
-      <section class="composer card">
+      <section
+        class="composer card"
+        :class="{ dropping: dragOver }"
+        @dragover.prevent="dragOver = true"
+        @dragleave="dragOver = false"
+        @drop.prevent="onDrop"
+      >
         <div class="composer-head">
           <div>
             <h2>记一笔</h2>
-            <p class="muted">自然语言或订单截图，支持一次多笔</p>
+            <p class="muted">文字、截图，或者两者一起提交</p>
           </div>
-          <el-radio-group v-model="tab" size="small">
-            <el-radio-button value="text">文本</el-radio-button>
-            <el-radio-button value="image">截图</el-radio-button>
-          </el-radio-group>
+          <span class="mode-hint">支持一次多笔</span>
         </div>
 
-        <div v-if="tab === 'text'" class="pane">
-          <el-input
-            v-model="text"
-            type="textarea"
-            :rows="6"
-            resize="none"
-            maxlength="4000"
-            show-word-limit
-            placeholder="例如：昨天中午和同事在海底捞吃饭花了 128.5 元；晚上打车回家 35 元"
-            @keydown.ctrl.enter="submit"
-          />
-          <div class="examples">
-            <span class="muted">试试：</span>
-            <button v-for="e in examples" :key="e" class="chip" @click="pickExample(e)">{{ e }}</button>
-          </div>
-        </div>
+        <el-input
+          v-model="text"
+          type="textarea"
+          :rows="5"
+          resize="none"
+          maxlength="4000"
+          show-word-limit
+          placeholder="直接描述消费，例如：昨晚在海底捞吃饭 128.5 元，打车回家 35 元"
+          @keydown.ctrl.enter="submit"
+        />
 
-        <div v-else class="pane">
+        <div class="attach-row">
           <el-upload
-            v-if="!previewUrl"
-            drag
             :auto-upload="false"
             :show-file-list="false"
             accept="image/png,image/jpeg,image/webp"
             :on-change="onFileChange"
           >
-            <div class="drop" :class="{ over: dragOver }" @dragover.prevent="dragOver = true" @dragleave="dragOver = false" @drop.prevent="onDrop">
-              <el-icon :size="30"><UploadFilled /></el-icon>
-              <p class="drop-title">拖拽截图到这里，或点击选择</p>
-              <p class="muted">支持 PNG / JPEG / WebP，单张不超过 10MB</p>
-            </div>
+            <el-button plain size="small">
+              <el-icon><Picture /></el-icon>
+              添加截图（可选）
+            </el-button>
           </el-upload>
-          <div v-else class="preview">
-            <img :src="previewUrl" alt="截图预览" />
-            <div class="preview-meta">
-              <span class="muted">{{ file?.name }}</span>
-              <el-button size="small" text type="danger" @click="clearFile">移除</el-button>
-            </div>
+          <span class="muted attach-tip">也可以直接把截图拖进这张卡片，文字和截图会一起识别</span>
+        </div>
+
+        <div v-if="previewUrl" class="preview">
+          <img :src="previewUrl" alt="截图预览" />
+          <div class="preview-meta">
+            <span class="muted">{{ file?.name }}</span>
+            <el-button size="small" text type="danger" @click="clearFile">移除</el-button>
           </div>
+        </div>
+
+        <div class="examples">
+          <span class="muted">试试：</span>
+          <button v-for="e in examples" :key="e" class="chip" @click="pickExample(e)">{{ e }}</button>
         </div>
 
         <div class="composer-foot">
@@ -203,7 +200,7 @@ onBeforeUnmount(() => {
             <span>入账</span>
           </div>
           <el-button type="primary" size="large" :loading="submitting" @click="submit">
-            {{ tab === 'text' ? '开始识别' : '上传并识别' }}
+            开始识别
           </el-button>
         </div>
       </section>
@@ -239,7 +236,7 @@ onBeforeUnmount(() => {
             </div>
             <div class="item-body">
               <div class="item-top">
-                <span class="kind">{{ item.kind === 'image' ? '截图' : '文本' }}</span>
+                <span class="kind">{{ kindLabel(item.kind) }}</span>
                 <StatusTag :status="item.status" />
                 <span class="time">{{ ago(item.created_at) }}</span>
               </div>
@@ -299,6 +296,32 @@ onBeforeUnmount(() => {
 .composer-head p {
   margin-top: 4px;
   font-size: 12.5px;
+}
+
+.mode-hint {
+  font-size: 11px;
+  color: var(--ink-muted);
+  background: #f2f4f7;
+  border: 1px solid var(--line);
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.attach-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.attach-tip {
+  font-size: 12px;
+}
+
+.composer.dropping {
+  border-color: #a5b4fc;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
 }
 
 .pane {
@@ -370,7 +393,7 @@ onBeforeUnmount(() => {
   display: block;
   margin: 0 auto;
   max-width: 100%;
-  max-height: 340px;
+  max-height: 260px;
   height: auto;
   background: #f8fafc;
 }

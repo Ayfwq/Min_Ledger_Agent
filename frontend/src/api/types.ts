@@ -1,4 +1,4 @@
-export type InputKind = 'text' | 'image'
+export type InputKind = 'text' | 'image' | 'mixed'
 export type InputStatus =
   | 'pending'
   | 'processing'

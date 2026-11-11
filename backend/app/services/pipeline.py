@@ -108,13 +108,17 @@ async def add_trace(
 
 
 async def _run_extraction(input_item: Input, image: Image | None) -> tuple[ExtractionResult, dict]:
-    if input_item.kind == "image":
+    if input_item.kind in ("image", "mixed"):
         if image is None:
             raise PipelineError("extract", "图片记录缺失，无法识别")
         from pathlib import Path
 
         path = Path(settings.upload_path) / image.storage_path
-        result, raw = await llm_client.extract_image(path, image.content_type)
+        result, raw = await llm_client.extract_image(
+            path,
+            image.content_type,
+            context_text=input_item.raw_text if input_item.kind == "mixed" else None,
+        )
     else:
         result, raw = await llm_client.extract_text(input_item.raw_text or "")
     return result, raw
@@ -467,7 +471,7 @@ async def build_drafts(session: AsyncSession, input_item: Input) -> list[Draft]:
     if not extraction.transactions:
         raise PipelineError("extract", "未能从输入中识别出任何账单，请补充描述或更换更清晰的截图")
 
-    source = "image" if input_item.kind == "image" else "text"
+    source = "image" if input_item.kind in ("image", "mixed") else "text"
     today = datetime.now().date()
     drafts: list[Draft] = []
     for seq, tx in enumerate(extraction.transactions):

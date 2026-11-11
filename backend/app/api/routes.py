@@ -4,7 +4,7 @@ import hashlib
 import io
 import uuid
 
-from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile
 from PIL import Image as PILImage
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -191,11 +191,8 @@ async def verify_password(body: AuthVerify) -> dict[str, bool]:
 # ------------------------------------------------------------------ inputs
 
 
-@router.post("/inputs", response_model=InputDetail, status_code=201)
-async def create_text_input(
-    body: TextInputCreate, session: AsyncSession = Depends(get_session)
-) -> InputDetail:
-    input_item = Input(kind="text", raw_text=body.text.strip(), status="pending")
+async def _create_text_input(session: AsyncSession, text: str) -> Input:
+    input_item = Input(kind="text", raw_text=text.strip(), status="pending")
     session.add(input_item)
     await session.flush()
     await add_trace(
@@ -204,17 +201,38 @@ async def create_text_input(
         "input.created",
         "ok",
         "创建文本输入",
-        {"chars": len(body.text)},
+        {"chars": len(text)},
     )
     await enqueue_job(session, input_item.id)
     await session.commit()
+    return input_item
+
+
+@router.post("/inputs", response_model=InputDetail, status_code=201)
+async def create_text_input(
+    body: TextInputCreate, session: AsyncSession = Depends(get_session)
+) -> InputDetail:
+    input_item = await _create_text_input(session, body.text)
     return await _input_detail(session, input_item.id)
 
 
 @router.post("/inputs/upload", response_model=InputDetail, status_code=201)
 async def upload_input(
-    file: UploadFile = File(...), session: AsyncSession = Depends(get_session)
+    file: UploadFile | None = File(default=None),
+    text: str = Form(default=""),
+    session: AsyncSession = Depends(get_session),
 ) -> InputDetail:
+    text = (text or "").strip()
+    if len(text) > 4000:
+        raise HTTPException(status_code=400, detail="文字描述不能超过 4000 字")
+
+    # Text-only submission through the unified composer.
+    if file is None:
+        if not text:
+            raise HTTPException(status_code=400, detail="请提供文字描述或上传截图")
+        input_item = await _create_text_input(session, text)
+        return await _input_detail(session, input_item.id)
+
     content_type = (file.content_type or "").lower()
     if content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="仅支持 PNG/JPEG/WebP 图片")
@@ -252,7 +270,13 @@ async def upload_input(
         session.add(image)
         await session.flush()
 
-    input_item = Input(kind="image", image_id=image.id, status="pending")
+    kind = "mixed" if text else "image"
+    input_item = Input(
+        kind=kind,
+        image_id=image.id,
+        raw_text=text or None,
+        status="pending",
+    )
     session.add(input_item)
     await session.flush()
     await add_trace(
@@ -260,8 +284,12 @@ async def upload_input(
         input_item.id,
         "input.created",
         "ok",
-        "上传截图",
-        {"filename": image.filename, "size_bytes": image.size_bytes},
+        "上传截图并附加文字" if text else "上传截图",
+        {
+            "filename": image.filename,
+            "size_bytes": image.size_bytes,
+            "text_chars": len(text),
+        },
     )
     await enqueue_job(session, input_item.id)
     await session.commit()

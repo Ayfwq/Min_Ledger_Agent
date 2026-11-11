@@ -255,22 +255,33 @@ class SiliconFlowClient:
         ]
         return await self._extract_with_repair(messages, self.text_model)
 
-    async def extract_image(self, path: Path, content_type: str) -> tuple[ExtractionResult, dict[str, Any]]:
+    async def extract_image(
+        self, path: Path, content_type: str, context_text: str | None = None
+    ) -> tuple[ExtractionResult, dict[str, Any]]:
         import asyncio
 
         encoded = base64.b64encode(await asyncio.to_thread(path.read_bytes)).decode("ascii")
+        content: list[dict[str, Any]] = [{"type": "text", "text": IMAGE_PROMPT}]
+        if context_text:
+            content.append(
+                {
+                    "type": "text",
+                    "text": (
+                        "用户同时提供了以下文字说明，可用于辅助理解；"
+                        "若文字与截图不一致，请在 ambiguous_fields 中标注对应字段，不要静默覆盖截图：\n"
+                        f"<<<\n{context_text}\n>>>"
+                    ),
+                }
+            )
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:{content_type};base64,{encoded}"},
+            }
+        )
         messages = [
             {"role": "system", "content": _system_prompt()},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": IMAGE_PROMPT},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:{content_type};base64,{encoded}"},
-                    },
-                ],
-            },
+            {"role": "user", "content": content},
         ]
         return await self._extract_with_repair(messages, self.vision_model)
 

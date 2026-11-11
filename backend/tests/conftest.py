@@ -94,7 +94,8 @@ def fake_llm(monkeypatch):
             "transactions": state["transactions"]
         }
 
-    async def fake_extract_image(path, content_type):
+    async def fake_extract_image(path, content_type, context_text=None):
+        state["image_context"] = context_text
         return await fake_extract_text("")
 
     monkeypatch.setattr("app.services.pipeline.llm_client.extract_text", fake_extract_text)
