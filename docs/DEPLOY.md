@@ -152,13 +152,28 @@ ledger.example.com {
 |------|------|
 | PostgreSQL | named volume `min-ledger_pgdata` |
 | 截图 | named volume `min-ledger_uploads` |
+| 备份文件 | `${APP_DIR}/backups`（默认保留 7 天） |
 
-备份：
+一键备份（数据库 + 截图）：
 
 ```bash
-docker exec -t $(docker compose ps -q db) pg_dump -U ledger ledger | gzip > backup-$(date +%F).sql.gz
-docker run --rm -v min-ledger_uploads:/data -v $PWD:/backup alpine \
-  tar czf /backup/uploads-$(date +%F).tar.gz -C /data .
+cd /opt/min-ledger
+./backup.sh
+# 或自定义：KEEP_DAYS=30 ./backup.sh
+```
+
+定时任务：
+
+```cron
+0 3 * * * cd /opt/min-ledger && ./backup.sh >> /var/log/ledger-backup.log 2>&1
+```
+
+恢复：
+
+```bash
+cd /opt/min-ledger
+gunzip -c backups/db-20261111-030000.sql.gz | docker compose exec -T db psql -U ledger -d ledger
+docker compose exec -T backend tar xzf - -C /app/data/uploads < backups/uploads-20261111-030000.tar.gz
 ```
 
 ---
