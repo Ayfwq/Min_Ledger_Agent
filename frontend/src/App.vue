@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { http, PASSWORD_KEY, setUnauthorizedHandler } from './api/client'
-import type { Stats } from './api/types'
+import { useStatsStore } from './stores/stats'
 
 const route = useRoute()
 
@@ -11,8 +11,7 @@ const authOpen = ref(false)
 const password = ref('')
 const authError = ref('')
 const verifying = ref(false)
-const stats = ref<Stats | null>(null)
-const healthy = ref(true)
+const statsStore = useStatsStore()
 
 const navs = [
   { path: '/', label: '工作台', icon: 'HomeFilled' },
@@ -22,16 +21,6 @@ const navs = [
 
 const pageTitle = computed(() => (route.meta.title as string) || 'Mini Ledger')
 const pageSubtitle = computed(() => (route.meta.subtitle as string) || '')
-
-async function loadStats() {
-  try {
-    const { data } = await http.get<Stats>('/stats')
-    stats.value = data
-    healthy.value = true
-  } catch {
-    healthy.value = false
-  }
-}
 
 async function verify() {
   if (!password.value) {
@@ -45,7 +34,7 @@ async function verify() {
     localStorage.setItem(PASSWORD_KEY, password.value)
     authOpen.value = false
     ElMessage.success('验证通过')
-    await loadStats()
+    await statsStore.refresh()
     window.location.reload()
   } catch {
     authError.value = '密码不正确'
@@ -59,8 +48,8 @@ setUnauthorizedHandler(() => {
 })
 
 onMounted(() => {
-  loadStats()
-  setInterval(loadStats, 30000)
+  statsStore.refresh()
+  setInterval(() => statsStore.refresh(), 15000)
 })
 </script>
 
@@ -85,21 +74,26 @@ onMounted(() => {
         >
           <el-icon :size="18"><component :is="item.icon" /></el-icon>
           <span>{{ item.label }}</span>
+          <span v-if="item.path === '/review' && statsStore.pendingReview" class="nav-badge">
+            {{ statsStore.pendingReview }}
+          </span>
         </RouterLink>
       </nav>
 
       <div class="side-foot">
-        <div class="stat-mini">
-          <span>待审核</span>
-          <strong class="mono">{{ stats?.pending_review ?? '—' }}</strong>
+        <div class="side-stats">
+          <div class="side-stat">
+            <strong class="mono">{{ statsStore.pendingReview }}</strong>
+            <span>待审核</span>
+          </div>
+          <div class="side-stat warn">
+            <strong class="mono">{{ statsStore.needsClarification }}</strong>
+            <span>待澄清</span>
+          </div>
         </div>
-        <div class="stat-mini">
-          <span>待澄清</span>
-          <strong class="mono">{{ stats?.needs_clarification ?? '—' }}</strong>
-        </div>
-        <div class="health" :class="{ down: !healthy }">
+        <div class="health" :class="{ down: !statsStore.online }">
           <span class="dot" />
-          {{ healthy ? '服务正常' : '服务不可用' }}
+          {{ statsStore.online ? '服务正常' : '服务不可用' }}
         </div>
       </div>
     </aside>
@@ -112,12 +106,18 @@ onMounted(() => {
         </div>
         <div class="top-actions">
           <div class="stat-chip">
-            <span>已入账</span>
-            <strong class="mono">{{ stats?.bills ?? 0 }} 笔</strong>
+            <span class="stat-ico"><el-icon><Wallet /></el-icon></span>
+            <div class="stat-body">
+              <span>已入账</span>
+              <strong class="mono">{{ statsStore.bills }} 笔</strong>
+            </div>
           </div>
           <div class="stat-chip accent">
-            <span>累计金额</span>
-            <strong class="mono">¥ {{ (stats?.total_amount ?? 0).toFixed(2) }}</strong>
+            <span class="stat-ico"><el-icon><TrendCharts /></el-icon></span>
+            <div class="stat-body">
+              <span>累计金额</span>
+              <strong class="mono">¥ {{ statsStore.totalAmount.toFixed(2) }}</strong>
+            </div>
           </div>
         </div>
       </header>
@@ -125,7 +125,7 @@ onMounted(() => {
       <main class="content">
         <RouterView v-slot="{ Component }">
           <transition name="fade" mode="out-in">
-            <component :is="Component" @changed="loadStats" />
+            <component :is="Component" />
           </transition>
         </RouterView>
       </main>
@@ -224,6 +224,25 @@ onMounted(() => {
   box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.35);
 }
 
+.nav-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.18);
+  color: #fbbf24;
+  font-size: 11px;
+  font-weight: 650;
+  display: grid;
+  place-items: center;
+}
+
+.stat-chip.accent .stat-ico {
+  background: #fff;
+  color: var(--brand);
+}
+
 .side-foot {
   margin-top: auto;
   display: flex;
@@ -236,14 +255,34 @@ onMounted(() => {
   font-size: 12px;
 }
 
-.stat-mini {
+.side-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.side-stat {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.side-stat strong {
+  font-size: 18px;
+  color: #f1f5f9;
+  line-height: 1.1;
+}
+
+.side-stat span {
+  font-size: 11px;
   color: #94a3b8;
 }
 
-.stat-mini strong {
-  color: #e2e8f0;
+.side-stat.warn strong {
+  color: #fbbf24;
 }
 
 .health {
@@ -303,15 +342,36 @@ onMounted(() => {
 
 .stat-chip {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 14px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 8px 10px;
   border-radius: 12px;
   background: #fff;
   border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+  min-width: 128px;
+}
+
+.stat-ico {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #f2f4f7;
+  color: #475467;
+  flex: none;
+}
+
+.stat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.stat-body span {
   font-size: 11px;
   color: var(--ink-muted);
-  min-width: 104px;
 }
 
 .stat-chip strong {

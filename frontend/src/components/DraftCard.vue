@@ -44,7 +44,7 @@ const sourceOf = (field: string) => props.draft.field_sources?.[field]
 </script>
 
 <template>
-  <article class="draft" :class="{ highlight, done: draft.status === 'confirmed' }">
+  <article class="draft" :class="['status-' + draft.status, { highlight, done: draft.status === 'confirmed' }]">
     <header class="head">
       <div class="left">
         <span class="seq">第 {{ draft.seq + 1 }} 笔</span>
@@ -164,7 +164,37 @@ const sourceOf = (field: string) => props.draft.field_sources?.[field]
 }
 
 .draft:hover {
-  box-shadow: var(--shadow-card);
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+}
+
+.draft::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #e4e7ec;
+}
+
+.draft.status-ready_for_review::before {
+  background: #6366f1;
+}
+
+.draft.status-needs_clarification::before {
+  background: #f59e0b;
+}
+
+.draft.status-confirmed::before {
+  background: #10b981;
+}
+
+.draft.status-rejected::before {
+  background: #cbd5e1;
+}
+
+.draft.status-confirmed .amount {
+  color: var(--green);
 }
 
 .draft.highlight {

@@ -5,6 +5,7 @@ import { apiError, http } from '@/api/client'
 import type { Draft } from '@/api/types'
 import DraftCard from '@/components/DraftCard.vue'
 import DraftEditor from '@/components/DraftEditor.vue'
+import { useStatsStore } from '@/stores/stats'
 
 const filters = [
   { value: 'ready_for_review', label: '待审核' },
@@ -14,6 +15,7 @@ const filters = [
   { value: '', label: '全部' },
 ]
 
+const statsStore = useStatsStore()
 const active = ref('ready_for_review')
 const drafts = ref<Draft[]>([])
 const loading = ref(false)
@@ -58,7 +60,7 @@ async function confirmDraft(draft: Draft) {
   try {
     const { data } = await http.post(`/drafts/${draft.id}/confirm`)
     ElMessage.success(data.idempotent ? '该草稿已入账，返回原有账单' : '已生成正式账单')
-    await load()
+    await Promise.all([load(), statsStore.refresh()])
   } catch (e) {
     ElMessage.error(apiError(e).message)
   }
@@ -77,7 +79,7 @@ async function rejectDraft(draft: Draft) {
   try {
     await http.post(`/drafts/${draft.id}/reject`)
     ElMessage.success('已拒绝')
-    await load()
+    await Promise.all([load(), statsStore.refresh()])
   } catch (e) {
     ElMessage.error(apiError(e).message)
   }
@@ -87,10 +89,14 @@ async function applySuggestion(draft: Draft, name: string, category: string) {
   try {
     await http.patch(`/drafts/${draft.id}`, { merchant: name, category, force: true })
     ElMessage.success(`已采用标准商户：${name}`)
-    await load()
+    await Promise.all([load(), statsStore.refresh()])
   } catch (e) {
     ElMessage.error(apiError(e).message)
   }
+}
+
+async function onSaved() {
+  await Promise.all([load(), statsStore.refresh()])
 }
 
 watch(active, load)
@@ -144,7 +150,7 @@ onMounted(load)
       </div>
     </div>
 
-    <DraftEditor v-model="editorOpen" :draft="editing" @saved="load()" />
+    <DraftEditor v-model="editorOpen" :draft="editing" @saved="onSaved" />
   </div>
 </template>
 

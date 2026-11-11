@@ -367,11 +367,36 @@ async def ensure_clarification(
             has_open_blocking = True
             break
 
-    # 3) optional fields -> non-blocking question, asked at most once
+    # 3) non-critical fields -> non-blocking questions (missing or ambiguous)
     if all(getattr(draft, field) is not None for field in CRITICAL_FIELDS):
         for field in ("merchant", "category"):
-            if getattr(draft, field) is not None:
-                continue
+            value = getattr(draft, field)
+            if value is not None:
+                if field != "merchant" or field in asked:
+                    continue
+                score = (draft.confidence or {}).get("merchant")
+                source = (draft.field_sources or {}).get("merchant")
+                if source == "user" or not isinstance(score, (int, float)) or score >= LOW_CONFIDENCE:
+                    continue
+                # Ambiguous: the screenshot/text gave a low-confidence merchant.
+                session.add(
+                    Clarification(
+                        input_id=input_item.id,
+                        draft_id=draft.id,
+                        field="merchant",
+                        kind="ambiguous",
+                        status="open",
+                        blocking=False,
+                        question=(
+                            f"系统识别到的商户是「{value}」，是否准确？"
+                            "如不准确请直接输入正确的商户名称；回复「正确」表示确认。"
+                        ),
+                        reason=f"商户识别置信度较低（{float(score):.2f}），需要确认",
+                        options={"existing": str(value), "confirm_word": "正确"},
+                        round=1,
+                    )
+                )
+                break
             if field in asked:
                 continue
             session.add(
@@ -640,8 +665,33 @@ async def answer_clarification(
 
     now = datetime.now(UTC)
     started = time.perf_counter()
+    confirm_words = {"正确", "是", "对", "准确", "确认", "没错", "是的", "确认正确"}
 
-    if action == "unknown":
+    if (
+        clarification.kind == "ambiguous"
+        and action == "answer"
+        and value is not None
+        and value.strip() in confirm_words
+    ):
+        confidence = dict(draft.confidence or {})
+        confidence["date" if clarification.field == "txn_date" else clarification.field] = 1.0
+        draft.confidence = confidence
+        clarification.status = "resolved"
+        clarification.answer = {
+            "action": "confirm",
+            "value": str(getattr(draft, clarification.field)),
+        }
+        clarification.answered_at = now
+        await add_trace(
+            session,
+            input_item.id,
+            "clarification.confirmed",
+            "ok",
+            f"用户确认{FIELD_LABELS.get(clarification.field, clarification.field)}识别正确",
+            {"field": clarification.field, "value": str(getattr(draft, clarification.field))},
+            draft_id=draft.id,
+        )
+    elif action == "unknown":
         clarification.status = "unknown"
         clarification.answer = {"action": "unknown"}
         clarification.answered_at = now

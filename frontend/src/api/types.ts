@@ -75,7 +75,7 @@ export interface Clarification {
   input_id: string
   draft_id: string | null
   field: string
-  kind: 'missing' | 'conflict'
+  kind: 'missing' | 'conflict' | 'ambiguous'
   status: 'open' | 'answered' | 'unknown' | 'cancelled' | 'resolved'
   blocking: boolean
   question: string
@@ -122,6 +122,7 @@ export interface InputItem {
   image: ImageInfo | null
   draft_count: number
   open_clarifications: number
+  latest_clarification?: string | null
   created_at: string
   updated_at: string
 }

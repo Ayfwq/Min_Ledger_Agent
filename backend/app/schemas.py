@@ -137,6 +137,7 @@ class InputListItem(BaseModel):
     image: ImageOut | None = None
     draft_count: int = 0
     open_clarifications: int = 0
+    latest_clarification: str | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -268,3 +268,68 @@ async def test_datasource_failure_does_not_block_draft(client, session, fake_llm
     assert resp.status_code == 200
     detail = await _detail(client, created["id"])
     assert not any(w["code"] == "datasource_failed" for w in detail["drafts"][0]["warnings"])
+
+@pytest.mark.asyncio
+async def test_low_confidence_merchant_gets_non_blocking_question(client, session, fake_llm):
+    fake_llm["transactions"] = [
+        {
+            "amount": 20.0,
+            "date": "2026-11-04",
+            "merchant": "星巳克",
+            "category": "餐饮",
+            "confidence": {"amount": 0.9, "date": 0.9, "merchant": 0.3},
+        }
+    ]
+    created = await _create(client, "2026-11-04 咖啡 20 元")
+    await _run(session, created["id"])
+    detail = await _detail(client, created["id"])
+    draft = detail["drafts"][0]
+    assert draft["status"] == "ready_for_review"
+    ambiguous = [c for c in detail["clarifications"] if c["kind"] == "ambiguous"]
+    assert ambiguous and ambiguous[0]["blocking"] is False
+    assert "星巳克" in ambiguous[0]["question"]
+
+    resp = await client.post(
+        f"/api/v1/clarifications/{ambiguous[0]['id']}/answer",
+        json={"action": "answer", "value": "正确"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "resolved"
+    detail = await _detail(client, created["id"])
+    assert detail["drafts"][0]["confidence"]["merchant"] == 1.0
+    assert not any(w["code"] == "low_confidence" for w in detail["drafts"][0]["warnings"])
+
+
+@pytest.mark.asyncio
+async def test_input_list_exposes_latest_clarification(client, session, fake_llm):
+    fake_llm["transactions"] = [{"amount": None, "date": "2026-11-04", "merchant": "星巴克"}]
+    created = await _create(client, "2026-11-04 喝咖啡")
+    await _run(session, created["id"])
+    items = (await client.get("/api/v1/inputs")).json()
+    row = next(i for i in items if i["id"] == created["id"])
+    assert row["open_clarifications"] == 1
+    assert "金额" in (row["latest_clarification"] or "")
+
+@pytest.mark.asyncio
+async def test_confirm_closes_optional_clarifications(client, session, fake_llm):
+    fake_llm["transactions"] = [
+        {"amount": 16.0, "date": "2026-11-06", "merchant": None, "category": "餐饮"}
+    ]
+    created = await _create(client, "2026-11-06 午饭 16 元")
+    await _run(session, created["id"])
+    detail = await _detail(client, created["id"])
+    draft = detail["drafts"][0]
+    assert draft["status"] == "ready_for_review"
+    open_before = [c for c in detail["clarifications"] if c["status"] == "open"]
+    assert open_before and open_before[0]["blocking"] is False
+
+    resp = await client.post(f"/api/v1/drafts/{draft['id']}/confirm")
+    assert resp.status_code == 200
+    detail = await _detail(client, created["id"])
+    assert not [c for c in detail["clarifications"] if c["status"] == "open"]
+    assert all(c["status"] == "cancelled" for c in detail["clarifications"])
+
+    items = (await client.get("/api/v1/inputs")).json()
+    row = next(i for i in items if i["id"] == created["id"])
+    assert row["open_clarifications"] == 0
+    assert row["latest_clarification"] is None

@@ -5,9 +5,11 @@ import { ElMessage } from 'element-plus'
 import { apiError, http } from '@/api/client'
 import type { InputItem } from '@/api/types'
 import StatusTag from '@/components/StatusTag.vue'
+import { useStatsStore } from '@/stores/stats'
 
 const router = useRouter()
 
+const statsStore = useStatsStore()
 const tab = ref<'text' | 'image'>('text')
 const text = ref('')
 const submitting = ref(false)
@@ -101,6 +103,7 @@ async function submit() {
     text.value = ''
     clearFile()
     ElMessage.success('已提交，正在识别…')
+    statsStore.refresh()
     router.push(`/inputs/${data.id}`)
   } catch (e) {
     ElMessage.error(apiError(e).message)
@@ -121,8 +124,12 @@ function ago(iso: string) {
 
 onMounted(() => {
   load()
+  statsStore.refresh()
   timer = window.setInterval(() => {
-    if (hasActive.value) load()
+    if (hasActive.value) {
+      load()
+      statsStore.refresh()
+    }
   }, 3000)
 })
 
@@ -223,7 +230,7 @@ onBeforeUnmount(() => {
           <button
             v-for="item in inputs"
             :key="item.id"
-            class="item"
+            class="item" :class="'s-' + item.status"
             @click="router.push(`/inputs/${item.id}`)"
           >
             <div class="thumb" :class="item.kind">
@@ -244,6 +251,9 @@ onBeforeUnmount(() => {
                 <span v-if="item.open_clarifications" class="amber">{{ item.open_clarifications }} 个待澄清</span>
                 <span v-if="item.failure_reason" class="red">{{ item.failure_reason }}</span>
               </div>
+              <p v-if="item.latest_clarification" class="item-clarify">
+                追问：{{ item.latest_clarification }}
+              </p>
             </div>
             <el-icon class="chev"><ArrowRight /></el-icon>
           </button>
@@ -268,7 +278,14 @@ onBeforeUnmount(() => {
   max-height: calc(100vh - 190px);
 }
 
-.composer-head {
+.composer::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6, #f59e0b);
+}
+.composer-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -428,6 +445,40 @@ onBeforeUnmount(() => {
   transform: translateY(-1px);
 }
 
+.item.s-needs_clarification {
+  border-left: 3px solid #f59e0b;
+}
+
+.item.s-ready_for_review {
+  border-left: 3px solid #6366f1;
+}
+
+.item.s-confirmed {
+  border-left: 3px solid #10b981;
+}
+
+.item.s-failed {
+  border-left: 3px solid #ef4444;
+}
+
+.item.s-rejected {
+  border-left: 3px solid #cbd5e1;
+}
+
+.item-clarify {
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 3px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .thumb {
   width: 40px;
   height: 40px;
@@ -512,7 +563,14 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
-  .composer-head {
+  .composer::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6, #f59e0b);
+}
+.composer-head {
     flex-wrap: wrap;
   }
 

@@ -49,6 +49,11 @@ async function submit(c: Clarification, action: 'answer' | 'unknown' | 'choose',
   }
 }
 
+function confirmAmbiguous(c: Clarification) {
+  answers[c.id] = '正确'
+  submit(c, 'answer')
+}
+
 async function cancel(c: Clarification) {
   try {
     await ElMessageBox.confirm('取消后该问题将关闭，草稿仍可在审核台编辑。', '取消澄清', {
@@ -89,7 +94,7 @@ async function cancel(c: Clarification) {
     <div class="thread">
       <div v-for="c in history" :key="c.id" class="turn">
         <div class="bubble system">
-          <span class="tag">{{ fieldLabel(c.field) }}{{ c.kind === 'conflict' ? ' · 冲突' : '' }}</span>
+          <span class="tag">{{ fieldLabel(c.field) }}{{ c.kind === 'conflict' ? ' · 冲突' : c.kind === 'ambiguous' ? ' · 待确认' : '' }}</span>
           {{ c.question }}
         </div>
         <div class="bubble user" :class="c.status">
@@ -125,6 +130,12 @@ async function cancel(c: Clarification) {
           </div>
         </template>
         <template v-else>
+          <div v-if="c.kind === 'ambiguous'" class="options">
+            <el-button size="small" type="success" plain :loading="busy === c.id" @click="confirmAmbiguous(c)">
+              识别正确
+            </el-button>
+            <span class="hint-inline">或直接输入正确的名称</span>
+          </div>
           <div class="input-row">
             <el-input
               v-model="answers[c.id]"
@@ -281,5 +292,9 @@ async function cancel(c: Clarification) {
 
 .options :deep(.el-button + .el-button) {
   margin-left: 0;
+}
+.hint-inline {
+  font-size: 12px;
+  color: var(--ink-muted);
 }
 </style>

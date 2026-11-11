@@ -9,10 +9,12 @@ import DraftCard from '@/components/DraftCard.vue'
 import DraftEditor from '@/components/DraftEditor.vue'
 import ClarificationPanel from '@/components/ClarificationPanel.vue'
 import TraceTimeline from '@/components/TraceTimeline.vue'
+import { useStatsStore } from '@/stores/stats'
 
 const route = useRoute()
 const router = useRouter()
 
+const statsStore = useStatsStore()
 const detail = ref<InputDetail | null>(null)
 const loading = ref(true)
 const editorOpen = ref(false)
@@ -64,7 +66,7 @@ async function confirmDraft(draft: Draft) {
   try {
     const { data } = await http.post(`/drafts/${draft.id}/confirm`)
     ElMessage.success(data.idempotent ? '该草稿已入账，返回原有账单' : '已生成正式账单')
-    await load()
+    await Promise.all([load(), statsStore.refresh()])
   } catch (e) {
     ElMessage.error(apiError(e).message)
   }
@@ -83,7 +85,7 @@ async function rejectDraft(draft: Draft) {
   try {
     await http.post(`/drafts/${draft.id}/reject`)
     ElMessage.success('已拒绝')
-    await load()
+    await Promise.all([load(), statsStore.refresh()])
   } catch (e) {
     ElMessage.error(apiError(e).message)
   }
@@ -97,7 +99,7 @@ async function applySuggestion(draft: Draft, name: string, category: string) {
       force: true,
     })
     ElMessage.success(`已采用标准商户：${data.merchant}`)
-    await load()
+    await Promise.all([load(), statsStore.refresh()])
   } catch (e) {
     ElMessage.error(apiError(e).message)
   }
@@ -108,7 +110,7 @@ async function retryInput() {
   try {
     await http.post(`/inputs/${inputId.value}/retry`)
     ElMessage.success('已重新排队处理')
-    await load()
+    await Promise.all([load(), statsStore.refresh()])
   } catch (e) {
     ElMessage.error(apiError(e).message)
   } finally {
@@ -122,12 +124,16 @@ async function retrySource(call: DataSourceCall) {
   try {
     await http.post(`/drafts/${call.draft_id}/datasources/${call.source}/retry`)
     ElMessage.success('数据源已重试')
-    await load()
+    await Promise.all([load(), statsStore.refresh()])
   } catch (e) {
     ElMessage.error(apiError(e).message)
   } finally {
     retryingSource.value = null
   }
+}
+
+async function onChanged() {
+  await Promise.all([load(), statsStore.refresh()])
 }
 
 function openEditor(draft: Draft) {
@@ -267,7 +273,7 @@ onBeforeUnmount(() => {
               :title="`有澄清问题已等待 ${staleHours} 小时`"
               description="可以继续补充、回复“暂不提供”，或取消该问题后在审核台直接编辑草稿。"
             />
-            <ClarificationPanel :clarifications="detail.clarifications" @changed="load()" />
+            <ClarificationPanel :clarifications="detail.clarifications" @changed="onChanged" />
           </section>
         </div>
 
@@ -358,7 +364,7 @@ onBeforeUnmount(() => {
       </div>
     </template>
 
-    <DraftEditor v-model="editorOpen" :draft="editing" @saved="load()" />
+    <DraftEditor v-model="editorOpen" :draft="editing" @saved="onChanged" />
   </div>
 </template>
 

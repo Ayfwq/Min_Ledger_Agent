@@ -149,6 +149,12 @@ async def _input_list_item(session: AsyncSession, input_item: Input) -> InputLis
         .select_from(Clarification)
         .where(Clarification.input_id == input_item.id, Clarification.status == "open")
     )
+    latest_question = await session.scalar(
+        select(Clarification.question)
+        .where(Clarification.input_id == input_item.id, Clarification.status == "open")
+        .order_by(Clarification.blocking.desc(), Clarification.created_at)
+        .limit(1)
+    )
     return InputListItem(
         id=input_item.id,
         kind=input_item.kind,
@@ -159,6 +165,7 @@ async def _input_list_item(session: AsyncSession, input_item: Input) -> InputLis
         image=_image_out(input_item.image),
         draft_count=draft_count or 0,
         open_clarifications=open_count or 0,
+        latest_clarification=latest_question,
         created_at=input_item.created_at,
         updated_at=input_item.updated_at,
     )

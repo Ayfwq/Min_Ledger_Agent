@@ -7,7 +7,7 @@
 ```bash
 cd backend
 uv run ruff check app tests
-uv run pytest -q          # 14 passed
+uv run pytest -q          # 17 passed
 ```
 
 | 用例 | 覆盖要求 |
@@ -20,9 +20,12 @@ uv run pytest -q          # 14 passed
 | `test_duplicate_detection_and_retry` | 查重命中历史账单、数据源调用留痕、单源重试 |
 | `test_llm_failure_then_retry` | 模型失败落库、失败步骤、输入可重试 |
 | `test_unknown_answer_keeps_blocking` | “不知道”记录状态且关键字段仍阻塞 |
+| `test_low_confidence_merchant_gets_non_blocking_question` | 低置信商户触发非阻塞“识别是否正确”确认 |
 | `test_image_upload_is_persisted` | 截图保存、来源标记为 `image` |
 | `test_datasource_failure_does_not_block_draft` | 数据源失败不阻塞草稿、警告展示、重试后清除 |
 | `test_auth` | 可选访问密码保护 |
+| `test_confirm_closes_optional_clarifications` | 入账/拒绝后关闭未回答的可选澄清 |
+| `test_input_list_exposes_latest_clarification` | 输入列表携带最新澄清问题 |
 | `test_parsing` | 金额/日期/商户归一化解析 |
 
 ## 二、浏览器端到端（Playwright）
@@ -53,12 +56,13 @@ BASE=http://127.0.0.1:18080 node tools/e2e_ui.cjs
 |----------|----------|----------|
 | 文本输入、多笔 | `services/llm.py` 提示词、`pipeline.build_drafts` | `test_multi_transaction_extraction` |
 | 截图上传、预览、持久化 | `POST /inputs/upload`、`frontend Workbench`、uploads volume | `test_image_upload_is_persisted`、UI E2E |
-| 输入列表区分类型/状态/澄清/草稿 | `Workbench.vue`、`GET /inputs` | UI |
+| 输入列表区分类型/状态/澄清/草稿 | `Workbench.vue`、`GET /inputs`（含最新追问） | UI + `test_input_list...` |
 | 金额/日期/商户/类别/来源 | `models.Draft.field_sources`、`DraftCard.vue` | UI 来源徽标 |
 | 关键字段缺失不可确认 | `ledger.confirm_draft` | `test_missing_amount_blocks_confirmation` |
 | 非关键字段不编造 | `_sync_from_extraction` 只写模型返回值 | `compute_warnings` |
 | 只阻塞不完整的那一笔 | 草稿级状态机 | `test_multi_transaction_extraction` |
 | 多轮澄清、不重复问 | `ensure_clarification` + `clarifications` 表 | `test_answer_clarification...` |
+| 歧义（低置信商户）主动确认 | `kind=ambiguous` + 「识别正确」按钮 | `test_low_confidence_merchant...` |
 | 不知道/暂不提供 | `action=unknown` | `test_unknown_answer_keeps_blocking` |
 | 冲突必须确认 | `_values_differ` + `force` | `test_conflict_requires_force_override`、UI 冲突弹窗 |
 | 澄清可取消 | `POST /clarifications/{id}/cancel` | UI「取消澄清」 |

@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Bill, Draft, IdempotencyKey, Input, Job
+from app.models import Bill, Clarification, Draft, IdempotencyKey, Input, Job
 from app.services import datasources
 from app.services.pipeline import (
     add_trace,
@@ -116,6 +116,22 @@ async def update_draft(
     return draft
 
 
+async def _close_open_clarifications(session: AsyncSession, draft_id: uuid.UUID, reason: str) -> int:
+    rows = (
+        await session.scalars(
+            select(Clarification).where(
+                Clarification.draft_id == draft_id, Clarification.status == "open"
+            )
+        )
+    ).all()
+    now = datetime.now(UTC)
+    for row in rows:
+        row.status = "cancelled"
+        row.answer = {"action": "cancelled", "reason": reason}
+        row.answered_at = now
+    return len(rows)
+
+
 async def confirm_draft(
     session: AsyncSession, draft_id: uuid.UUID, idempotency_key: str | None = None
 ) -> tuple[Bill, bool]:
@@ -153,6 +169,7 @@ async def confirm_draft(
     )
     session.add(bill)
     draft.status = "confirmed"
+    await _close_open_clarifications(session, draft.id, "草稿已确认入账")
 
     if idempotency_key:
         session.add(
@@ -204,6 +221,7 @@ async def reject_draft(session: AsyncSession, draft_id: uuid.UUID, reason: str |
     if draft.status == "rejected":
         return draft
     draft.status = "rejected"
+    await _close_open_clarifications(session, draft.id, "草稿已被拒绝")
     input_item = await session.get(Input, draft.input_id)
     await add_trace(
         session,
