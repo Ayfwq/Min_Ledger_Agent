@@ -1,5 +1,8 @@
 # Mini Ledger Agent
 
+[![CI](https://github.com/Ayfwq/Min_Ledger_Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Ayfwq/Min_Ledger_Agent/actions/workflows/ci.yml)
+[![Deploy](https://github.com/Ayfwq/Min_Ledger_Agent/actions/workflows/deploy.yml/badge.svg)](https://github.com/Ayfwq/Min_Ledger_Agent/actions/workflows/deploy.yml)
+
 > 可澄清、可追溯的智能记账助手 —— 文本 / 截图输入，自动抽取多笔账单，主动澄清缺失与冲突，人工审核后入账。
 
 一个完整的全栈作业项目：**FastAPI + PostgreSQL + 硅基流动 LLM + Vue 3**，支持 Docker Compose 部署与 GitHub Actions CI/CD。
@@ -220,3 +223,21 @@ uv run pytest -q
 - `.env` 已被 `.gitignore` 排除，**不要提交任何 API Key**；
 - 生产环境请设置 `APP_PASSWORD`，并通过 HTTPS（Caddy / Nginx + certbot）暴露服务；
 - 如果 Key 曾出现在聊天记录、日志或截图中，建议到硅基流动控制台**重置**。
+
+---
+
+## 实现进度
+
+| 模块 | 状态 |
+|------|------|
+| 数据模型 + Alembic 迁移（含 30 条商户种子） | ✅ |
+| 文本 / 截图抽取（硅基流动 DeepSeek + Qwen3-VL） | ✅ |
+| 澄清状态机、冲突确认、暂不提供、取消 | ✅ |
+| 查重 + 商户目录（独立失败/重试/轨迹） | ✅ |
+| 审核编辑、幂等确认、拒绝、并发保护 | ✅ |
+| Vue 3 工作台 / 详情 / 审核台 / 账单 | ✅ |
+| Docker Compose + Nginx 本地整栈验证 | ✅ |
+| GitHub Actions CI（lint / test / build） | ✅ |
+| GHCR 构建推送 + SSH 部署脚本（含回滚） | ✅ |
+| 服务器上线 | ⏳ 等待服务器 SSH 信息与 Secrets 配置 |
+
