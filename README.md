@@ -213,7 +213,7 @@ uv run pytest -q
 
 1. 服务器执行 `deploy/server-bootstrap.sh` 安装 Docker；
 2. 在 `/opt/min-ledger/.env` 填写生产配置；
-3. 配置 GitHub Secrets：`SSH_HOST`、`SSH_USER`、`SSH_KEY`、`SSH_PORT`（可选）、`GHCR_PAT`（可选）；
+3. 配置 GitHub Secrets：`SSH_HOST`、`SSH_USER`、`SSH_KEY` 或 `SSH_PASSWORD`、`SSH_PORT`（可选）、`GHCR_PAT`（可选）；
 4. push 到 `main` → Actions 构建镜像 → SSH 部署 → 健康检查失败自动回滚。
 
 ---
