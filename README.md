@@ -4,6 +4,16 @@
 
 一个完整的全栈作业项目：**FastAPI + PostgreSQL + 硅基流动 LLM + Vue 3**，支持 Docker Compose 部署与 GitHub Actions CI/CD。
 
+## 界面预览
+
+| 工作台 | 审核台 |
+|---|---|
+| ![工作台](docs/screenshots/workbench.png) | ![审核台](docs/screenshots/review.png) |
+
+| 处理详情（澄清 / 数据源 / 轨迹） | 正式账单 |
+|---|---|
+| ![处理详情](docs/screenshots/input-detail.png) | ![正式账单](docs/screenshots/bills.png) |
+
 ---
 
 ## 功能一览
