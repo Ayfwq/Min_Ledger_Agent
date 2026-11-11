@@ -17,6 +17,13 @@
 |---|---|
 | ![处理详情](docs/screenshots/input-detail.png) | ![正式账单](docs/screenshots/bills.png) |
 
+移动端适配：
+
+<p>
+  <img src="docs/screenshots/mobile-workbench.png" width="260" alt="移动端工作台" />
+  <img src="docs/screenshots/mobile-detail.png" width="260" alt="移动端详情" />
+</p>
+
 ---
 
 ## 功能一览

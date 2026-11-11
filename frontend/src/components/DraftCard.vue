@@ -325,11 +325,19 @@ const sourceOf = (field: string) => props.draft.field_sources?.[field]
 
 @media (max-width: 640px) {
   .fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 
   .field.wide {
-    grid-column: span 2;
+    grid-column: span 1;
+  }
+
+  .label {
+    white-space: nowrap;
+  }
+
+  .foot {
+    flex-wrap: wrap;
   }
 }
 </style>

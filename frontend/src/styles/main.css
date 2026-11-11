@@ -133,6 +133,10 @@ p {
   gap: 20px;
 }
 
+.grid-2 > * {
+  min-width: 0;
+}
+
 @media (max-width: 1080px) {
   .grid-2 {
     grid-template-columns: 1fr;

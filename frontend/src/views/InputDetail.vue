@@ -574,4 +574,21 @@ onBeforeUnmount(() => {
     flex: 1;
   }
 }
+
+@media (max-width: 640px) {
+  .kind,
+  .metric span {
+    white-space: nowrap;
+  }
+
+  .block-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .head-side {
+    flex-wrap: wrap;
+  }
+}
 </style>

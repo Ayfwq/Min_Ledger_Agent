@@ -261,6 +261,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 16px;
   align-self: start;
+  min-width: 0;
 }
 
 .list {
@@ -306,6 +307,7 @@ onBeforeUnmount(() => {
   font-size: 12px;
   cursor: pointer;
   max-width: 100%;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -507,5 +509,35 @@ onBeforeUnmount(() => {
   padding: 0;
   border: none;
   background: transparent;
+}
+
+@media (max-width: 640px) {
+  .composer-head {
+    flex-wrap: wrap;
+  }
+
+  .composer-foot {
+    flex-wrap: wrap;
+  }
+
+  .flow {
+    display: none;
+  }
+
+  .item-top {
+    flex-wrap: wrap;
+  }
+
+  .item-top .time {
+    margin-left: 0;
+  }
+
+  .item-meta {
+    flex-wrap: wrap;
+  }
+
+  .kind {
+    white-space: nowrap;
+  }
 }
 </style>
