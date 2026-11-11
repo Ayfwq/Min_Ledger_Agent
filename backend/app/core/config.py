@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     siliconflow_base_url: str = "https://api.siliconflow.cn/v1"
     llm_text_model: str = "deepseek-ai/DeepSeek-V3.2"
     llm_vision_model: str = "Qwen/Qwen3-VL-32B-Instruct"
-    llm_timeout_seconds: float = 90.0
+    llm_timeout_seconds: float = 120.0
     llm_max_retries: int = 2
     # Optional explicit proxy for the LLM call (e.g. http://127.0.0.1:7890).
     # Empty means a direct connection; ambient HTTP(S)_PROXY is ignored.
