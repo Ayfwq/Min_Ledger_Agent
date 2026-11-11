@@ -131,8 +131,30 @@ cd /opt/min-ledger
 
 ---
 
-## 6. HTTPS（可选但推荐）
+## 5.1 80/443 已被其它项目占用
 
+安全组只开放 80/443 时，不要停掉现有 Nginx。用独立端口 + 宿主机 Nginx 反代：
+
+```bash
+# 1) .env 里选择空闲端口
+HTTP_PORT=8080
+
+# 2) 宿主机 Nginx 增加一个 vhost（不会影响其它 server_name）
+scp deploy/nginx-vhost.conf.example root@<server>:/etc/nginx/conf.d/min-ledger.conf
+ssh root@<server> 'nginx -t && nginx -s reload'
+```
+
+没有域名时可用 `nip.io` 泛解析，例如 `ledger.47.111.128.185.nip.io`（自动解析到该 IP）。
+把 vhost 中的 `server_name` 改成它即可通过 `http://ledger.47.111.128.185.nip.io/` 访问。
+
+删除该文件并 `nginx -s reload` 即可完全撤销，不影响服务器上其它站点。
+
+> Docker Hub 在大陆经常不可达：`.env` 里设置 `DB_IMAGE=docker.m.daocloud.io/library/postgres:16-alpine`。
+> GHCR 拉取慢时设置 `IMAGE_REGISTRY=ghcr.nju.edu.cn`，部署脚本会自动改用该镜像代理。
+
+---
+
+## 6. HTTPS（可选但推荐）
 用 Caddy 反代 80/443 最简单：
 
 ```caddyfile

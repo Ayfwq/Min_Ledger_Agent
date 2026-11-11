@@ -246,5 +246,6 @@ uv run pytest -q
 | Docker Compose + Nginx 本地整栈验证 | ✅ |
 | GitHub Actions CI（lint / test / build） | ✅ |
 | GHCR 构建推送 + SSH 部署脚本（含回滚） | ✅ |
-| 服务器上线 | ⏳ 等待服务器 SSH 信息与 Secrets 配置 |
+| 服务器上线（Docker Compose + 宿主机 Nginx 反代） | ✅ |
+| GitHub Actions 自动部署到服务器 | ✅ |
 
