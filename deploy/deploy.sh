@@ -33,17 +33,21 @@ wait_health() {
 }
 
 echo "==> pulling images"
-for attempt in 1 2 3; do
-  if docker compose pull; then
-    break
-  fi
-  if [ "$attempt" -eq 3 ]; then
-    echo "!! docker compose pull failed after 3 attempts" >&2
-    exit 1
-  fi
-  echo "!! pull failed (attempt ${attempt}), retrying in 5s" >&2
-  sleep 5
-done
+if [ "${SKIP_PULL:-0}" = "1" ]; then
+  echo "==> SKIP_PULL=1, using local images"
+else
+  for attempt in 1 2 3; do
+    if docker compose pull; then
+      break
+    fi
+    if [ "$attempt" -eq 3 ]; then
+      echo "!! docker compose pull failed after 3 attempts" >&2
+      exit 1
+    fi
+    echo "!! pull failed (attempt ${attempt}), retrying in 5s" >&2
+    sleep 5
+  done
+fi
 
 echo "==> starting containers"
 docker compose up -d --remove-orphans

@@ -176,7 +176,49 @@ docker run --rm -v min-ledger_uploads:/data -v $PWD:/backup alpine \
 
 ---
 
-## 9. 手动部署（不使用 Actions）
+## 9. 镜像拉取慢 / 无法访问 GHCR
+
+大陆服务器访问 GHCR、Docker Hub 可能很慢，按情况选一种：
+
+**A. 数据库镜像换源**（最快）：
+
+```bash
+# 在 .env 中
+DB_IMAGE=docker.m.daocloud.io/library/postgres:16-alpine
+```
+
+**B. 推到其它镜像仓库**（阿里云 ACR / 腾讯 TCR）：
+
+```bash
+docker pull ghcr.io/ayfwq/min-ledger-backend:latest
+docker tag  ghcr.io/ayfwq/min-ledger-backend:latest registry.cn-hangzhou.aliyuncs.com/<namespace>/min-ledger-backend:latest
+docker push registry.cn-hangzhou.aliyuncs.com/<namespace>/min-ledger-backend:latest
+# web 同理，然后在 .env 覆盖：
+# BACKEND_IMAGE=registry.cn-hangzhou.aliyuncs.com/<namespace>/min-ledger-backend:latest
+# WEB_IMAGE=registry.cn-hangzhou.aliyuncs.com/<namespace>/min-ledger-web:latest
+```
+
+**C. 离线镜像包**（完全不依赖仓库）：
+
+```bash
+# 有网络的机器
+docker pull ghcr.io/ayfwq/min-ledger-backend:<tag>
+docker pull ghcr.io/ayfwq/min-ledger-web:<tag>
+docker save ghcr.io/ayfwq/min-ledger-backend:<tag> ghcr.io/ayfwq/min-ledger-web:<tag> | gzip > ledger-images.tar.gz
+scp ledger-images.tar.gz user@server:/opt/min-ledger/
+
+# 服务器
+cd /opt/min-ledger
+gunzip -c ledger-images.tar.gz | docker load
+# .env 里设置 PULL_POLICY=missing
+PULL_POLICY=missing SKIP_PULL=1 ./deploy.sh <tag>
+```
+
+> `postgres:16-alpine` 也需要在服务器上可用（`docker pull` 或同样离线导入）。
+
+---
+
+## 10. 手动部署（不使用 Actions）
 
 ```bash
 # 本地构建并推送
