@@ -100,7 +100,10 @@ async function onSaved() {
 }
 
 watch(active, load)
-onMounted(load)
+onMounted(() => {
+  load()
+  statsStore.refresh()
+})
 </script>
 
 <template>

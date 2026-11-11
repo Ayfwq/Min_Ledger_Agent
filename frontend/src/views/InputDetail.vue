@@ -43,9 +43,11 @@ const staleHours = computed(() => {
 
 async function load(showLoading = false) {
   if (showLoading) loading.value = true
+  const wasBusy = busy.value
   try {
     const { data } = await http.get<InputDetail>(`/inputs/${inputId.value}`)
     detail.value = data
+    if (wasBusy && !busy.value) statsStore.refresh()
   } catch (e) {
     ElMessage.error(apiError(e).message)
   } finally {
@@ -157,6 +159,7 @@ function time(iso: string) {
 }
 
 onMounted(async () => {
+  statsStore.refresh()
   await load(true)
   timer = window.setInterval(() => {
     if (busy.value) load()
