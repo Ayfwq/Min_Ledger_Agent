@@ -8,9 +8,10 @@ plain Python so they can be trusted and tested.
 from __future__ import annotations
 
 import logging
+import re
 import time
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -174,6 +175,59 @@ async def _upsert_draft(
     session.add(draft)
     await session.flush()
     return draft, True
+
+
+_AMOUNT_VERB = re.compile(
+    r"(?:实际|一共|总共|共|合计|花了|付了|支付了?|消费了?)\s*[^\d]{0,4}(\d+(?:\.\d{1,2})?)"
+)
+_AMOUNT_UNIT = re.compile(r"(\d+(?:\.\d{1,2})?)\s*(?:元|块|块钱)")
+_DATE_ABS = re.compile(r"(20\d{2})[-/年.](\d{1,2})[-/月.](\d{1,2})")
+_RELATIVE_DAYS = {"昨天": -1, "昨日": -1, "今天": 0, "今日": 0, "前天": -2, "大前天": -3}
+
+
+def _flag_text_conflicts(draft: Draft, text: str, today: date) -> None:
+    """For mixed inputs, compare numbers/dates in the text with the screenshot.
+
+    The LLM is asked to flag conflicts, but small models often silently prefer
+    the screenshot. This deterministic pass guarantees the "35.5 vs 40" case
+    becomes an explicit conflict question.
+    """
+    if not text:
+        return
+    amounts = [
+        Decimal(match.group(1))
+        for pattern in (_AMOUNT_VERB, _AMOUNT_UNIT)
+        for match in pattern.finditer(text)
+    ]
+    conflicts = dict(draft.conflict or {})
+    if amounts and draft.amount is not None:
+        proposed = amounts[-1]
+        if abs(proposed - draft.amount) > Decimal("0.009"):
+            conflicts.setdefault(
+                "amount",
+                {"existing": str(draft.amount), "proposed": str(proposed)},
+            )
+
+    parsed_date: date | None = None
+    match = _DATE_ABS.search(text)
+    if match:
+        try:
+            parsed_date = date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        except ValueError:
+            parsed_date = None
+    if parsed_date is None:
+        for word, delta in _RELATIVE_DAYS.items():
+            if word in text:
+                parsed_date = today + timedelta(days=delta)
+                break
+    if parsed_date is not None and draft.txn_date is not None and parsed_date != draft.txn_date:
+        conflicts.setdefault(
+            "txn_date",
+            {"existing": str(draft.txn_date), "proposed": str(parsed_date)},
+        )
+
+    if conflicts:
+        draft.conflict = conflicts
 
 
 def _sync_from_extraction(draft: Draft, tx: Any, source: str, today: date) -> None:
@@ -520,6 +574,8 @@ async def build_drafts(session: AsyncSession, input_item: Input) -> list[Draft]:
             drafts.append(draft)
             continue
         _sync_from_extraction(draft, tx, source, today)
+        if input_item.kind == "mixed" and input_item.raw_text:
+            _flag_text_conflicts(draft, input_item.raw_text, today)
         await session.flush()
         await ensure_clarification(session, input_item, draft)
         drafts.append(draft)

@@ -7,7 +7,7 @@
 ```bash
 cd backend
 uv run ruff check app tests
-uv run pytest -q          # 21 passed
+uv run pytest -q          # 22 passed
 ```
 
 | 用例 | 覆盖要求 |
@@ -59,6 +59,7 @@ BASE=http://127.0.0.1:18080 node tools/e2e_ui.cjs
 | 截图上传、预览、持久化 | `POST /inputs/upload`、`frontend Workbench`、uploads volume | `test_image_upload_is_persisted`、UI E2E |
 | 文字 + 截图同时提交 | 统一输入框 `kind=mixed` | `test_mixed_text_and_image_input` |
 | 图文冲突 → 歧义确认 | 模型 `ambiguous_fields` → 阻塞确认 | `test_ambiguous_critical_field_blocks_confirm_until_resolved` |
+| 截图金额 35.5 vs 文字 40 | 确定性冲突检测 → 二选一 | `test_mixed_text_conflict_with_screenshot` |
 | 输入列表区分类型/状态/澄清/草稿 | `Workbench.vue`、`GET /inputs`（含最新追问） | UI + `test_input_list...` |
 | 金额/日期/商户/类别/来源 | `models.Draft.field_sources`、`DraftCard.vue` | UI 来源徽标 |
 | 关键字段缺失不可确认 | `ledger.confirm_draft` | `test_missing_amount_blocks_confirmation` |

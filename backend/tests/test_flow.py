@@ -423,3 +423,41 @@ async def test_ambiguous_critical_field_blocks_confirm_until_resolved(client, se
     assert detail["drafts"][0]["status"] == "ready_for_review"
     ok = await client.post(f"/api/v1/drafts/{draft['id']}/confirm")
     assert ok.status_code == 200
+
+@pytest.mark.asyncio
+async def test_mixed_text_conflict_with_screenshot(client, session, fake_llm):
+    import io
+
+    from PIL import Image as PILImage
+
+    fake_llm["transactions"] = [
+        {"amount": 35.0, "date": "2026-11-10", "merchant": "滴滴出行", "category": "交通"}
+    ]
+    buf = io.BytesIO()
+    PILImage.new("RGB", (320, 480), "white").save(buf, format="PNG")
+    resp = await client.post(
+        "/api/v1/inputs/upload",
+        files={"file": ("trip.png", buf.getvalue(), "image/png")},
+        data={"text": "截图显示 35 元，但我实际付了 48 元"},
+    )
+    assert resp.status_code == 201, resp.text
+    await _run(session, resp.json()["id"])
+    detail = await _detail(client, resp.json()["id"])
+    draft = detail["drafts"][0]
+    assert draft["conflict"]["amount"]["existing"] == "35.00"
+    assert draft["conflict"]["amount"]["proposed"] == "48"
+    conflict = [c for c in detail["clarifications"] if c["kind"] == "conflict"]
+    assert conflict and conflict[0]["blocking"] is True
+
+    blocked = await client.post(f"/api/v1/drafts/{draft['id']}/confirm")
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"]["code"] == "conflict_pending"
+
+    chosen = await client.post(
+        f"/api/v1/clarifications/{conflict[0]['id']}/answer",
+        json={"action": "choose", "choice": "new"},
+    )
+    assert chosen.status_code == 200
+    detail = await _detail(client, resp.json()["id"])
+    assert detail["drafts"][0]["amount"] == "48.00"
+    assert detail["drafts"][0]["status"] == "ready_for_review"
