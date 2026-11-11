@@ -5,20 +5,28 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/min-ledger}"
 TAG="${1:-latest}"
-REGISTRY="${REGISTRY:-ghcr.io}"
 IMAGE_OWNER="${IMAGE_OWNER:-ayfwq}"
-HTTP_PORT="${HTTP_PORT:-80}"
 
 cd "$APP_DIR"
-
-BACKEND_IMAGE="${REGISTRY}/${IMAGE_OWNER}/min-ledger-backend:${TAG}"
-WEB_IMAGE="${REGISTRY}/${IMAGE_OWNER}/min-ledger-web:${TAG}"
-export BACKEND_IMAGE WEB_IMAGE
 
 if [ ! -f .env ]; then
   echo "missing $APP_DIR/.env (copy deploy/.env.example and fill it in)" >&2
   exit 1
 fi
+
+get_env() {
+  # read a key from .env (tolerate BOM / CRLF) without sourcing it
+  tr -d '\357\273\277' < .env | grep -E "^$1=" | tail -n 1 | cut -d= -f2- | tr -d '\r' || true
+}
+
+REGISTRY="${REGISTRY:-$(get_env IMAGE_REGISTRY)}"
+REGISTRY="${REGISTRY:-ghcr.io}"
+HTTP_PORT="${HTTP_PORT:-$(get_env HTTP_PORT)}"
+HTTP_PORT="${HTTP_PORT:-80}"
+
+BACKEND_IMAGE="${REGISTRY}/${IMAGE_OWNER}/min-ledger-backend:${TAG}"
+WEB_IMAGE="${REGISTRY}/${IMAGE_OWNER}/min-ledger-web:${TAG}"
+export BACKEND_IMAGE WEB_IMAGE
 
 echo "==> deploying tag: ${TAG}"
 

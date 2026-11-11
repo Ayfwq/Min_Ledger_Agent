@@ -245,6 +245,5 @@ docker push ghcr.io/ayfwq/min-ledger-backend:manual
 docker push ghcr.io/ayfwq/min-ledger-web:manual
 
 # 服务器
-cd /opt/min-ledger
-./deploy.sh manual
+cd /opt/min-ledger\n./deploy.sh manual
 ```
