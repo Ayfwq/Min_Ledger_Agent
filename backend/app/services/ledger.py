@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -156,6 +156,18 @@ async def confirm_draft(
         raise LedgerError("关键字段（金额/日期）缺失，不能确认入账", code="missing_critical")
     if draft.amount < 0:
         raise LedgerError("金额不能为负数", code="invalid_amount")
+
+    open_blocking = await session.scalar(
+        select(func.count())
+        .select_from(Clarification)
+        .where(
+            Clarification.draft_id == draft.id,
+            Clarification.status == "open",
+            Clarification.blocking.is_(True),
+        )
+    )
+    if open_blocking:
+        raise LedgerError("还有未解决的澄清问题，请先回答", code="clarification_pending")
 
     bill = Bill(
         draft_id=draft.id,

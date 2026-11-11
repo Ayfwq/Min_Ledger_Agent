@@ -389,3 +389,37 @@ async def test_text_only_through_upload_endpoint(client, session, fake_llm):
     resp = await client.post("/api/v1/inputs/upload", data={"text": "便利店买水 9.9"})
     assert resp.status_code == 201, resp.text
     assert resp.json()["kind"] == "text"
+
+@pytest.mark.asyncio
+async def test_ambiguous_critical_field_blocks_confirm_until_resolved(client, session, fake_llm):
+    fake_llm["transactions"] = [
+        {
+            "amount": 35.5,
+            "date": "2026-11-09",
+            "merchant": "海底捞",
+            "category": "餐饮",
+            "confidence": {"amount": 0.55, "date": 0.9, "merchant": 0.9},
+            "ambiguous_fields": ["amount"],
+        }
+    ]
+    created = await _create(client, "昨晚聚餐，文字说 40，截图 35.5")
+    await _run(session, created["id"])
+    detail = await _detail(client, created["id"])
+    draft = detail["drafts"][0]
+    assert draft["status"] == "needs_clarification"
+    ambiguous = [c for c in detail["clarifications"] if c["kind"] == "ambiguous"]
+    assert ambiguous and ambiguous[0]["blocking"] is True
+
+    blocked = await client.post(f"/api/v1/drafts/{draft['id']}/confirm")
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"]["code"] == "clarification_pending"
+
+    resp = await client.post(
+        f"/api/v1/clarifications/{ambiguous[0]['id']}/answer",
+        json={"action": "answer", "value": "正确"},
+    )
+    assert resp.status_code == 200
+    detail = await _detail(client, created["id"])
+    assert detail["drafts"][0]["status"] == "ready_for_review"
+    ok = await client.post(f"/api/v1/drafts/{draft['id']}/confirm")
+    assert ok.status_code == 200

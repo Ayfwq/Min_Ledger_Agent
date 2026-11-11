@@ -268,7 +268,8 @@ class SiliconFlowClient:
                     "type": "text",
                     "text": (
                         "用户同时提供了以下文字说明，可用于辅助理解；"
-                        "若文字与截图不一致，请在 ambiguous_fields 中标注对应字段，不要静默覆盖截图：\n"
+                        "若文字中的金额/日期/商户与截图明显不一致，请以截图为准，"
+                        "把该字段加入 ambiguous_fields 并降低置信度，不要擅自采用文字值：\n"
                         f"<<<\n{context_text}\n>>>"
                     ),
                 }

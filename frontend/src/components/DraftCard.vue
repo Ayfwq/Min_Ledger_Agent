@@ -27,7 +27,12 @@ const amountText = computed(() => {
 
 const criticalMissing = computed(() => !props.draft.amount || !props.draft.txn_date)
 const canConfirm = computed(
-  () => props.draft.status !== 'confirmed' && props.draft.status !== 'rejected' && !criticalMissing.value && !props.draft.conflict,
+  () =>
+    props.draft.status !== 'confirmed' &&
+    props.draft.status !== 'rejected' &&
+    props.draft.status !== 'needs_clarification' &&
+    !criticalMissing.value &&
+    !props.draft.conflict,
 )
 
 const merchantSuggestion = computed(() => {

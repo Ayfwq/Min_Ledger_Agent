@@ -217,6 +217,12 @@ def _sync_from_extraction(draft: Draft, tx: Any, source: str, today: date) -> No
         confidence.setdefault("date", 0.8)
     draft.confidence = confidence
 
+    ambiguous = [field for field in (tx.ambiguous_fields or []) if field in FIELD_LABELS]
+    if ambiguous:
+        suggestions = dict(draft.suggestions or {})
+        suggestions["ambiguous_fields"] = ambiguous
+        draft.suggestions = suggestions
+
 
 def compute_warnings(draft: Draft) -> list[dict]:
     warnings: list[dict] = []
@@ -345,6 +351,38 @@ async def ensure_clarification(
         )
         has_open_blocking = True
 
+    # 1.5) model-reported ambiguity (e.g. text contradicts the screenshot)
+    if not has_open_blocking and not draft.conflict:
+        ambiguous_fields = [
+            field
+            for field in (draft.suggestions or {}).get("ambiguous_fields", []) or []
+            if field in FIELD_LABELS and getattr(draft, field) is not None and field not in asked
+        ]
+        ambiguous_fields.sort(key=lambda f: 0 if f in CRITICAL_FIELDS else 1)
+        if ambiguous_fields:
+            field = ambiguous_fields[0]
+            value = getattr(draft, field)
+            blocking = field in CRITICAL_FIELDS
+            session.add(
+                Clarification(
+                    input_id=input_item.id,
+                    draft_id=draft.id,
+                    field=field,
+                    kind="ambiguous",
+                    status="open",
+                    blocking=blocking,
+                    question=(
+                        f"系统识别到{ FIELD_LABELS[field] }为「{value}」，但存在歧义。"
+                        "请确认是否正确；如不正确，请直接输入正确值。"
+                    ),
+                    reason="识别结果存在歧义，需要人工确认",
+                    options={"existing": str(value), "confirm_word": "正确"},
+                    round=1,
+                )
+            )
+            asked[field] = "open"
+            has_open_blocking = has_open_blocking or blocking
+
     # 2) missing critical fields -> blocking question, one at a time
     if not has_open_blocking and not draft.conflict:
         for field in CRITICAL_FIELDS:
@@ -426,14 +464,16 @@ async def ensure_clarification(
         if not already:
             await datasources.run_all(session, draft, input_item)
 
-    recompute_draft_status(draft)
+    recompute_draft_status(draft, has_blocking=has_open_blocking)
     draft.warnings = compute_warnings(draft)
 
 
-def recompute_draft_status(draft: Draft) -> None:
+def recompute_draft_status(draft: Draft, *, has_blocking: bool = False) -> None:
     if draft.status in ("confirmed", "rejected"):
         return
     if draft.conflict:
+        draft.status = "needs_clarification"
+    elif has_blocking:
         draft.status = "needs_clarification"
     elif any(getattr(draft, field) is None for field in CRITICAL_FIELDS):
         draft.status = "needs_clarification"
