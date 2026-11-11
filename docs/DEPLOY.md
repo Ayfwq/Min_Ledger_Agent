@@ -21,9 +21,12 @@
 
 ## 1. 服务器初始化
 
+把初始化脚本上传到服务器并执行：
+
 ```bash
-# 在服务器上
-sudo bash server-bootstrap.sh
+scp deploy/server-bootstrap.sh deploy/.env.example user@<server>:/tmp/
+ssh user@<server>
+sudo bash /tmp/server-bootstrap.sh
 # 或手动：
 curl -fsSL https://get.docker.com | sh
 mkdir -p /opt/min-ledger
@@ -59,9 +62,13 @@ vim .env
 |--------|------|------|
 | `SSH_HOST` | ✅ | 服务器 IP / 域名 |
 | `SSH_USER` | ✅ | SSH 用户（需在 docker 组） |
-| `SSH_KEY` | ✅ | 私钥（PEM，含 BEGIN/END 行） |
+| `SSH_KEY` | 二选一 | 私钥（PEM，含 BEGIN/END 行） |
+| `SSH_PASSWORD` | 二选一 | 服务器登录密码（与 `SSH_KEY` 填一个即可） |
 | `SSH_PORT` | 可选 | 默认 22 |
-| `GHCR_PAT` | 可选 | 拉取私有镜像用的 PAT（`read:packages`） |
+| `GHCR_PAT` | 可选 | 拉取私有镜像用的 PAT（`read:packages`）；镜像已公开时不需要 |
+
+> 用密码登录服务器时只填 `SSH_PASSWORD`，不要同时填 `SSH_KEY`。
+> 推荐方式仍是密钥；密码方式适合临时/测试服务器。
 
 生成部署密钥：
 

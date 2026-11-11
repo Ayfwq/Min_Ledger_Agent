@@ -26,13 +26,20 @@ jobs:
       - id: check
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
         run: |
-          if [ -n "$SSH_HOST" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
+          if [ -z "$SSH_HOST" ]; then
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "::notice::SSH_HOST is not configured, skipping deploy (images are still built)."
+            exit 0
           fi
+          if [ -z "$SSH_KEY" ] && [ -z "$SSH_PASSWORD" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Neither SSH_KEY nor SSH_PASSWORD is configured, skipping deploy."
+            exit 0
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build & push images
@@ -105,6 +112,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SSH_PORT || 22 }}
           source: 'deploy/docker-compose.prod.yml,deploy/deploy.sh'
           target: '/opt/min-ledger'
@@ -122,6 +130,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SSH_PORT || 22 }}
           envs: TAG,IMAGE_OWNER,GHCR_USER,GHCR_PAT
           script_stop: true
