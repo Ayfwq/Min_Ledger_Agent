@@ -23,7 +23,7 @@ fi
 echo "==> deploying tag: ${TAG}"
 
 wait_health() {
-  for _ in $(seq 1 40); do
+  for _ in $(seq 1 "${HEALTH_ATTEMPTS:-40}"); do
     if curl -fsS "http://127.0.0.1:${HTTP_PORT}/api/v1/health" >/dev/null 2>&1; then
       return 0
     fi
@@ -32,25 +32,47 @@ wait_health() {
   return 1
 }
 
+rollback() {
+  echo "!! deployment unhealthy, attempting rollback" >&2
+  docker compose logs --tail=120 backend >&2 || true
+
+  if [ ! -f .last_good_tag ]; then
+    echo "!! no previous good tag recorded; manual intervention required" >&2
+    return 1
+  fi
+
+  PREV="$(cat .last_good_tag)"
+  if [ -z "$PREV" ] || [ "$PREV" = "$TAG" ]; then
+    echo "!! previous tag is '${PREV:-<empty>}', nothing to roll back to" >&2
+    return 1
+  fi
+
+  echo "==> rolling back to ${PREV}"
+  export BACKEND_IMAGE="${REGISTRY}/${IMAGE_OWNER}/min-ledger-backend:${PREV}"
+  export WEB_IMAGE="${REGISTRY}/${IMAGE_OWNER}/min-ledger-web:${PREV}"
+  if docker compose up -d --remove-orphans && wait_health; then
+    echo "==> rollback healthy (${PREV})" >&2
+    return 0
+  fi
+  echo "!! rollback also unhealthy" >&2
+  return 1
+}
+
 echo "==> pulling images"
 if [ "${SKIP_PULL:-0}" = "1" ]; then
   echo "==> SKIP_PULL=1, using local images"
 else
-  for attempt in 1 2 3; do
-    if docker compose pull; then
-      break
-    fi
-    if [ "$attempt" -eq 3 ]; then
-      echo "!! docker compose pull failed after 3 attempts" >&2
-      exit 1
-    fi
-    echo "!! pull failed (attempt ${attempt}), retrying in 5s" >&2
-    sleep 5
-  done
+  if ! docker compose pull; then
+    echo "!! docker compose pull failed, keeping current containers" >&2
+    exit 1
+  fi
 fi
 
 echo "==> starting containers"
-docker compose up -d --remove-orphans
+if ! docker compose up -d --remove-orphans; then
+  rollback || true
+  exit 1
+fi
 
 echo "==> waiting for health check"
 if wait_health; then
@@ -60,18 +82,5 @@ if wait_health; then
   exit 0
 fi
 
-echo "!! health check failed, attempting rollback" >&2
-docker compose logs --tail=120 backend >&2 || true
-
-if [ -f .last_good_tag ]; then
-  PREV="$(cat .last_good_tag)"
-  if [ -n "$PREV" ] && [ "$PREV" != "$TAG" ]; then
-    echo "==> rolling back to ${PREV}"
-    export BACKEND_IMAGE="${REGISTRY}/${IMAGE_OWNER}/min-ledger-backend:${PREV}"
-    export WEB_IMAGE="${REGISTRY}/${IMAGE_OWNER}/min-ledger-web:${PREV}"
-    docker compose up -d --remove-orphans
-    wait_health && echo "==> rollback healthy" || echo "!! rollback also unhealthy" >&2
-  fi
-fi
-
+rollback || true
 exit 1
