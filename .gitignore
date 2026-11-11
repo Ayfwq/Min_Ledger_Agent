@@ -38,3 +38,9 @@ tools/pdf_text.txt
 *.pdf
 .pytest-ledger.db
 deploy/.last_good_tag
+
+# one-off admin scripts (contain host-specific details)
+tools/ssh_probe.py
+tools/ssh_probe2.py
+tools/server_provision.py
+tools/gh_setup_secrets.py
