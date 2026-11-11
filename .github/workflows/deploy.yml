@@ -15,8 +15,6 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/min-ledger-backend
-  WEB_IMAGE: ghcr.io/${{ github.repository_owner }}/min-ledger-web
 
 jobs:
   preflight:
@@ -51,6 +49,14 @@ jobs:
         id: vars
         run: echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
 
+      - name: Normalize image names
+        id: images
+        run: |
+          # GHCR repository names must be lowercase; GitHub owners may not be.
+          owner="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          echo "backend=${REGISTRY}/${owner}/min-ledger-backend" >> "$GITHUB_OUTPUT"
+          echo "web=${REGISTRY}/${owner}/min-ledger-web" >> "$GITHUB_OUTPUT"
+
       - uses: docker/setup-buildx-action@v3
 
       - name: Login to GHCR
@@ -65,9 +71,10 @@ jobs:
         with:
           context: ./backend
           push: true
+          provenance: false
           tags: |
-            ${{ env.BACKEND_IMAGE }}:${{ steps.vars.outputs.tag }}
-            ${{ env.BACKEND_IMAGE }}:latest
+            ${{ steps.images.outputs.backend }}:${{ steps.vars.outputs.tag }}
+            ${{ steps.images.outputs.backend }}:latest
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
@@ -76,9 +83,10 @@ jobs:
         with:
           context: ./frontend
           push: true
+          provenance: false
           tags: |
-            ${{ env.WEB_IMAGE }}:${{ steps.vars.outputs.tag }}
-            ${{ env.WEB_IMAGE }}:latest
+            ${{ steps.images.outputs.web }}:${{ steps.vars.outputs.tag }}
+            ${{ steps.images.outputs.web }}:latest
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 
@@ -107,6 +115,7 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           TAG: ${{ github.event.inputs.tag || needs.build.outputs.tag }}
+          IMAGE_OWNER: ${{ github.repository_owner }}
           GHCR_USER: ${{ github.actor }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
         with:
@@ -114,11 +123,12 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          envs: TAG,GHCR_USER,GHCR_PAT
+          envs: TAG,IMAGE_OWNER,GHCR_USER,GHCR_PAT
           script_stop: true
           script: |
             set -e
             cd /opt/min-ledger
+            export IMAGE_OWNER="$(echo "${IMAGE_OWNER}" | tr '[:upper:]' '[:lower:]')"
             if [ -n "${GHCR_PAT}" ]; then
               echo "${GHCR_PAT}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
             fi

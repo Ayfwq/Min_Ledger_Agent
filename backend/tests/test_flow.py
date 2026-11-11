@@ -211,3 +211,58 @@ async def test_unknown_answer_keeps_blocking(client, session, fake_llm):
     assert resp.json()["status"] == "unknown"
     detail = await _detail(client, created["id"])
     assert detail["drafts"][0]["status"] == "needs_clarification"
+
+@pytest.mark.asyncio
+async def test_image_upload_is_persisted(client, session, fake_llm, tmp_path=None):
+    import io
+
+    from PIL import Image as PILImage
+
+    fake_llm["transactions"] = [
+        {"amount": 19.9, "date": "2026-11-09", "merchant": "瑞幸咖啡", "category": "餐饮"}
+    ]
+    buf = io.BytesIO()
+    PILImage.new("RGB", (320, 480), "white").save(buf, format="PNG")
+    resp = await client.post(
+        "/api/v1/inputs/upload",
+        files={"file": ("receipt.png", buf.getvalue(), "image/png")},
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["kind"] == "image"
+    assert body["image"]["url"].startswith("/uploads/")
+    await _run(session, body["id"])
+    detail = await _detail(client, body["id"])
+    assert detail["drafts"][0]["field_sources"]["amount"] == "image"
+
+
+@pytest.mark.asyncio
+async def test_datasource_failure_does_not_block_draft(client, session, fake_llm, monkeypatch):
+    from app.services.datasources import SourceOutcome
+
+    async def broken(session_, draft):
+        return SourceOutcome(source="duplicate_check", status="failed", error="查重服务超时")
+
+    monkeypatch.setattr("app.services.datasources.check_duplicates", broken)
+    fake_llm["transactions"] = [
+        {"amount": 12.0, "date": "2026-11-03", "merchant": "瑞幸咖啡", "category": "餐饮"}
+    ]
+    created = await _create(client, "瑞幸12元")
+    await _run(session, created["id"])
+    detail = await _detail(client, created["id"])
+    draft = detail["drafts"][0]
+    assert draft["status"] == "ready_for_review"
+    assert any(w["code"] == "datasource_failed" for w in draft["warnings"])
+
+    async def fixed(session_, draft_):
+        return SourceOutcome(
+            source="duplicate_check",
+            status="ok",
+            result={"candidates": [], "checked_window_days": 3},
+        )
+
+    monkeypatch.setattr("app.services.datasources.check_duplicates", fixed)
+    resp = await client.post(f"/api/v1/drafts/{draft['id']}/datasources/duplicate_check/retry")
+    assert resp.status_code == 200
+    detail = await _detail(client, created["id"])
+    assert not any(w["code"] == "datasource_failed" for w in detail["drafts"][0]["warnings"])
