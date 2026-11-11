@@ -20,6 +20,14 @@ if ! docker compose version >/dev/null 2>&1; then
   apt-get install -y docker-compose-plugin
 fi
 
+# Allow the (sudo) login user to run docker without sudo.
+if [ -n "${SUDO_USER:-}" ] && [ "${SUDO_USER}" != "root" ]; then
+  if ! id -nG "${SUDO_USER}" | grep -qw docker; then
+    usermod -aG docker "${SUDO_USER}"
+    echo "==> added ${SUDO_USER} to the docker group (re-login to take effect)"
+  fi
+fi
+
 echo "==> creating ${APP_DIR}"
 mkdir -p "${APP_DIR}"
 

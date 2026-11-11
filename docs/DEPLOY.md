@@ -168,6 +168,8 @@ docker run --rm -v min-ledger_uploads:/data -v $PWD:/backup alpine \
 | 现象 | 处理 |
 |------|------|
 | `unauthorized` 拉取镜像 | 配置 `GHCR_PAT`，或在 Packages 设为 Public |
+| `permission denied` 连接 Docker | SSH 用户不在 docker 组：`sudo usermod -aG docker $USER` 后重新登录 |
+| `exec format error` | 服务器是 ARM 架构，需要构建 `linux/arm64` 镜像（默认仅 amd64） |
 | 健康检查失败 | `docker compose logs backend`；常见为 `.env` 缺 Key、数据库密码含特殊字符 |
 | 页面 404 | Nginx 未命中 `try_files`，确认镜像为最新 `min-ledger-web` |
 | 上传大图失败 | 调整 `.env` 的 `MAX_UPLOAD_MB` 与 Nginx `client_max_body_size` |
