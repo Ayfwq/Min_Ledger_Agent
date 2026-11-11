@@ -7,7 +7,7 @@
 ```bash
 cd backend
 uv run ruff check app tests
-uv run pytest -q          # 17 passed
+uv run pytest -q          # 18 passed
 ```
 
 | 用例 | 覆盖要求 |
@@ -26,6 +26,7 @@ uv run pytest -q          # 17 passed
 | `test_auth` | 可选访问密码保护 |
 | `test_confirm_closes_optional_clarifications` | 入账/拒绝后关闭未回答的可选澄清 |
 | `test_input_list_exposes_latest_clarification` | 输入列表携带最新澄清问题 |
+| `test_merchant_catalog_falls_back_to_description` | 商户缺失时用说明查询商户目录 |
 | `test_parsing` | 金额/日期/商户归一化解析 |
 
 ## 二、浏览器端到端（Playwright）
@@ -67,7 +68,7 @@ BASE=http://127.0.0.1:18080 node tools/e2e_ui.cjs
 | 冲突必须确认 | `_values_differ` + `force` | `test_conflict_requires_force_override`、UI 冲突弹窗 |
 | 澄清可取消 | `POST /clarifications/{id}/cancel` | UI「取消澄清」 |
 | 历史账单/草稿查重 | `datasources.check_duplicates` | `test_duplicate_detection_and_retry` |
-| 商户目录标准化 | `datasources.lookup_merchant` + 30 条种子 | UI「商户目录建议」 |
+| 商户目录标准化（商户或说明） | `datasources.lookup_merchant` + 30 条种子 | UI「商户目录建议」、`test_merchant_catalog...` |
 | 数据源独立失败/重试 | `datasource_calls` + `/datasources/{source}/retry` | `test_datasource_failure...` |
 | 疑似重复/低置信提示 | `compute_warnings`、`duplicate_candidates` | UI 黄色提示 |
 | 审核编辑/确认/拒绝 | `Review.vue`、`ledger.py` | UI E2E |

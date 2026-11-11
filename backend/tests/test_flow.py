@@ -333,3 +333,22 @@ async def test_confirm_closes_optional_clarifications(client, session, fake_llm)
     row = next(i for i in items if i["id"] == created["id"])
     assert row["open_clarifications"] == 0
     assert row["latest_clarification"] is None
+
+@pytest.mark.asyncio
+async def test_merchant_catalog_falls_back_to_description(client, session, fake_llm, merchants):
+    fake_llm["transactions"] = [
+        {
+            "amount": 33.0,
+            "date": "2026-11-07",
+            "merchant": None,
+            "description": "星巴克拿铁",
+            "category": None,
+            "confidence": {"amount": 0.9, "date": 0.9},
+        }
+    ]
+    created = await _create(client, "2026-11-07 星巴克拿铁 33 元")
+    await _run(session, created["id"])
+    detail = await _detail(client, created["id"])
+    suggestion = detail["drafts"][0]["suggestions"].get("merchant") or {}
+    assert suggestion.get("matched") is True
+    assert suggestion["merchant"]["name"] == "星巴克"

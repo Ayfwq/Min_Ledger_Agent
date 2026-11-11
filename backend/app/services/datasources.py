@@ -156,16 +156,19 @@ async def check_duplicates(session: AsyncSession, draft: Draft) -> SourceOutcome
 
 async def lookup_merchant(session: AsyncSession, draft: Draft) -> SourceOutcome:
     started = time.perf_counter()
-    if not draft.merchant:
+    # When the merchant is missing (blurry screenshot), fall back to the
+    # description, e.g. "星巴克拿铁" -> 星巴克.
+    query_text = draft.merchant or draft.note
+    if not query_text:
         return SourceOutcome(
             source="merchant_catalog",
             status="skipped",
             request={},
-            error="缺少商户名称，暂无法标准化",
+            error="缺少商户名称和说明，暂无法标准化",
         )
 
-    query = normalize_merchant(draft.merchant)
-    request = {"merchant": draft.merchant, "normalized": query}
+    query = normalize_merchant(query_text)
+    request = {"merchant": draft.merchant, "note": draft.note, "normalized": query}
     try:
         rows = (
             await session.scalars(
